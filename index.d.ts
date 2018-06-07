@@ -13,16 +13,18 @@ export class Client extends NodeJS.EventEmitter {
 
   disconnect(cb?: (err: any, data: any) => any): this;
 
-  getMetadata(metadataOptions: MetadataOptionsOneTopic | null, cb: (err: Error | null, data: Metadata) => void): void;
+export type callbackError<U = void> = (error: Error) => U;
+export type callbackNoError<T, U = void> = (error: null, result: T) => U;
+export type callback<T, U = void> = callbackError<U> | callbackNoError<T, U>;
 
-  offsetsForTimes(topicPartitions: any[], timeout: number, cb?: (err: any, offsets: any) => any): void;
-  offsetsForTimes(topicPartitions: any[], cb?: (err: any, offsets: any) => any): void;
+offsetsForTimes(topicPartitions: any[], timeout: number, cb ?: (err: any, offsets: any) => any): void;
+offsetsForTimes(topicPartitions: any[], cb ?: (err: any, offsets: any) => any): void;
 
-  // currently need to overload signature for different callback arities because of https://github.com/Microsoft/TypeScript/issues/15972
-  on<T extends keyof EventCallbackRepositoryArityOne, K extends EventCallbackRepositoryArityOne[T]>(val: T, listener: (arg: K) => void): this;
-  on<T extends keyof EventCallbackRepositoryArityTwo, K extends EventCallbackRepositoryArityTwo[T]>(val: T, listener: (arg0: K[0], arg1: K[1]) => void): this;
-  once<T extends keyof EventCallbackRepositoryArityOne, K extends EventCallbackRepositoryArityOne[T]>(val: T, listener: (arg: K) => void): this;
-  once<T extends keyof EventCallbackRepositoryArityTwo, K extends EventCallbackRepositoryArityTwo[T]>(val: T, listener: (arg0: K[0], arg1: K[1]) => void): this;
+// currently need to overload signature for different callback arities because of https://github.com/Microsoft/TypeScript/issues/15972
+on<T extends keyof EventCallbackRepositoryArityOne, K extends EventCallbackRepositoryArityOne[T]>(val: T, listener: (arg: K) => void): this;
+on<T extends keyof EventCallbackRepositoryArityTwo, K extends EventCallbackRepositoryArityTwo[T]>(val: T, listener: (arg0: K[0], arg1: K[1]) => void): this;
+once<T extends keyof EventCallbackRepositoryArityOne, K extends EventCallbackRepositoryArityOne[T]>(val: T, listener: (arg: K) => void): this;
+once<T extends keyof EventCallbackRepositoryArityTwo, K extends EventCallbackRepositoryArityTwo[T]>(val: T, listener: (arg0: K[0], arg1: K[1]) => void): this;
 }
 
 export type ErrorWrap<T> = boolean | T;
@@ -73,35 +75,82 @@ export class KafkaConsumer extends Client {
   unsubscribe(): any;
 }
 
-export class Producer extends Client {
-  constructor(conf: any, topicConf: any);
-
-  disconnect(): Producer;
-  disconnect(cb?: (err: null, data: ClientMetrics) => void): Producer;
-  disconnect(timeout: number, cb?: (err: null, data: ClientMetrics) => void): Producer;
-
-  flush(timeout?: number, cb?: (err: Error | null, _: never) => void): Producer;
-
-  poll(): Producer;
-
-  produce(
-    topic: string,
-    partition: number | null,
-    message: Buffer | null,
-    key?: number[] | string,
-    timestamp?: number,
-    opaque?: any
-  ): boolean | Error;
-
-  setPollInterval(interval: any): any;
+export interface StreamConfig {
+  waitInterval: number;
+  topics: string | string[] | RegExp | ((topicMetadata: Metadata) => string);
 }
 
-export interface DeliveryReport {
-  topic: string;
-  partition: number;
-  offset: number;
-  opaque?: any;
+export namespace Kafka {
+  export interface Connection { }
+  export interface KafkaConsumer extends Connection { }
+  export interface Producer extends Connection { }
 }
+
+export interface LibRdKafkaError extends Error {
+  message: string;
+  code: KafkaErrorCode;
+  origin: "local" | "kafka";
+}
+
+// export interface DeliveryReport {
+//   topic: string;
+//   partition: number;
+//   offset: number;
+//   opaque?: any;
+// }
+
+export namespace Events {
+  export interface DeliveryReportEvent {
+    topic: string;
+    partition: number;
+    offset: number;
+    opaque?: any;
+  }
+  interface DisconnectedEvent {
+    connectionOpened: Date;
+  }
+
+  interface ErrorEvent extends LibRdKafkaError { }
+
+  interface EventEvent {
+    message: string;
+  }
+  interface LogEvent {
+    message: string;
+    severity: LogEvent.Severity;
+    fac: string;
+  }
+
+  namespace LogEvent {
+    enum Severity {
+      EMERG = 0,
+      ALERT = 1,
+      CRITICAL = 2,
+      ERROR = 3,
+      WARNING = 4,
+      NOTICE = 5,
+      INFO = 6,
+      DEBUG = 7
+    }
+  }
+
+  interface ReadyEvent {
+    name: string;
+  }
+
+  interface StatisticsEvent {
+    message: string;
+  }
+
+  interface ThrottleEvent {
+    brokerId: number;
+    brokerName: string;
+    message: string;
+    throttleTime: number;
+  }
+}
+
+export type KafkaMessage = ConsumerStreamMessage;
 
 export interface MetadataOptionsOneTopic {
   topic: string;
@@ -144,14 +193,158 @@ export interface ClientMetrics {
   connectionOpened: Date;
 }
 
-export class TopicPartition {
-  constructor(topic: string, partition: number, offset: OffsetType);
-  static create(spec: TopicSpec): TopicPartition;
-  static map(specs: TopicSpec[]): TopicPartition[];
+export interface TopicPartitionOffset extends TopicPartition {
+  offset: number;
 }
 
-export type OffsetType = "earliest" | "beginning" | "latest" | "end" | number | null | undefined;
-export type TopicSpec = { topic: string; partition: number; offset: OffsetType }
+export interface TopicPartition {
+  topic: string;
+  partition: number;
+}
+
+export type OffsetType = "earliest" | "beginning" | "latest" | "end" | "stored" | number | Date;
+
+export interface SpecifiesTopicPartitionOffset {
+  topic: string;
+  partition: number;
+  offset?: OffsetType | null;
+}
+
+export class TopicPartitionOffsetSpecification implements SpecifiesTopicPartitionOffset {
+  constructor(topic: string, partition: number, offset?: OffsetType | null);
+  static create(specification: SpecifiesTopicPartitionOffset): TopicPartitionOffsetSpecification;
+  static map(specifications: SpecifiesTopicPartitionOffset[]): TopicPartitionOffsetSpecification[];
+
+  topic: string;
+  partition: number;
+  offset: OffsetType;
+}
+
+
+export interface watermarkOffsets {
+  high: number;
+  low: number;
+}
+
+// mhaan added above
+
+export class Client extends NodeJS.EventEmitter {
+
+  constructor(globalConf: GlobalConfig, SubClientType: Kafka.Connection, topicConf: TopicConfig | undefined);
+
+  // connect(metadataOptions: MetadataOptions, cb?: (err: Error | null, metadata: Metadata) => void): Client;
+  connect(metadataOptions: MetadataOptions, cb?: callback<Metadata>): Client;
+
+  connectedTime(): number;
+
+  // disconnect(cb?: (err: null, data: ClientMetrics) => void): Client;
+  // disconnect(cb: callbackNoError<ClientMetrics>): void;
+
+  // getClient(): Client;
+  getClient(): Kafka.Connection;
+
+  getLastError(): Error | null;
+
+  // getMetadata(metadataOptions: MetadataOptions, cb: (err: Error | null, data: Metadata) => void): void;
+  getMetadata(metadataOptions: MetadataOptions, cb: callback<Metadata>): void;
+
+  isConnected(): boolean;
+
+  offsetsForTimes(topicPartitionOffsets: SpecifiesTopicPartitionOffset[], timeout: number, cb: callback<SpecifiesTopicPartitionOffset[]>): void;
+
+  queryWatermarkOffsets(topic: string, partition: number, timeout: number, cb?: callback<watermarkOffsets>): void;
+
+  // queryWatermarkOffsets(
+  //   topic: string,
+  //   partition: number,
+  //   timeout: any,
+  //   // cb?: (err: any, offsets: any) => any
+  //   cb?: callback<watermarkOffsets>
+  // ): any;
+
+  on(event: "delivery-report", listener: (error: LibRdKafkaError, report: Events.DeliveryReportEvent) => void): this;
+  on(event: "disconnected", listener: (info: Events.DisconnectedEvent) => void): this;
+  on(event: "event", listener: (info: Events.EventEvent) => void): this;
+  on(event: "event.error", listener: (info: Events.ErrorEvent) => void): this;
+  on(event: "event.log", listener: (info: Events.LogEvent) => void): this;
+  on(event: "event.stats", listener: (info: Events.StatisticsEvent) => void): this;
+  on(event: "event.throttle", listener: (info: Events.ThrottleEvent) => void): this;
+  on(event: "ready", listener: (info: Events.ReadyEvent, metadata: Metadata) => void): this;
+}
+
+export class KafkaConsumer extends Client {
+  constructor(conf: GlobalConfig, topicConf: TopicConfig | undefined);
+
+  assign(assignments: SpecifiesTopicPartitionOffset[]): KafkaConsumer;
+
+  assignments(): TopicPartition[];
+
+  commit(topicPartitionOffsets: TopicPartitionOffset | TopicPartitionOffset[] | null): KafkaConsumer;
+
+  commitMessage(msg: TopicPartitionOffset): KafkaConsumer;
+
+  commitMessageSync(msg: TopicPartitionOffset): KafkaConsumer;
+
+  commitSync(topicPartitionOffsets: TopicPartitionOffset | TopicPartitionOffset[] | null): KafkaConsumer;
+
+  committed(topicPartitions: TopicPartition[], timeout: number, cb: callback<TopicPartitionOffset[]>): KafkaConsumer;
+  committed(timeout: number, cb: callback<TopicPartitionOffset[]>): KafkaConsumer;
+
+  // consume(number: any, cb?: (error: Error | null, messages: KafkaMessage[]) => void): void;
+  consume(maxMessageCount: number, cb?: callback<KafkaMessage[]>): void;
+
+  static createReadStream(conf: GlobalConfig, topicConf: TopicConfig, streamOptions: StreamConfig): ConsumerStream;
+
+  disconnect(cb?: callbackNoError<ClientMetrics>): Client;
+
+  getWatermarkOffsets(topic: string, partition: number): watermarkOffsets;
+
+  offsetsStore(topicPartitions: TopicPartitionOffset[]): void;
+
+  pause(topicPartitions: TopicPartition[]): true | Error;
+
+  position(topicPartitions: TopicPartition[]): TopicPartitionOffset[];
+
+  resume(topicPartitions: TopicPartition[]): true | Error;
+
+  // seek(toppar: any, timeout: any, cb: any): any;
+  seek(topicPartitionOffset: TopicPartitionOffset, timeout: number | null, cb: callback<void>): KafkaConsumer;
+
+  setDefaultConsumeTimeout(timeoutMs: number): void;
+
+  subscribe(topics: string[]): KafkaConsumer;
+
+  subscription(): string[];
+
+  unassign(): KafkaConsumer;
+
+  unsubscribe(): KafkaConsumer;
+}
+
+export class Producer extends Client {
+  constructor(globalConf: GlobalConfig, topicConf: TopicConfig | undefined);
+
+  static createWriteStream(conf: GlobalConfig, topicConf: TopicConfig, streamOptions: StreamConfig): ProducerStream;
+
+  disconnect(timeout: number, cb: callback<ClientMetrics>): void;
+
+  // flush(timeout?: number | null, cb?: (err: Error | null, _: never) => void): Producer;
+  flush(timeout?: number | null, cb?: callbackError): Producer;
+
+  poll(): Producer;
+
+  produce(
+    topic: string,
+    partition: number | null,
+    message: Buffer | null,
+    //key?: number[] | string,
+    key?: string,
+    timestamp?: number,
+    opaque?: any
+  ): boolean | LibRdKafkaError;
+
+  setPollInterval(interval: number): Producer;
+}
 
 export const CODES: {
   ERRORS: {
@@ -229,23 +422,30 @@ export const CODES: {
   };
 };
 
+export type KafkaErrorCode = {
+  [P in keyof typeof CODES.ERRORS]: number;
+}
+
 export const features: string[];
 
 export const librdkafkaVersion: string;
 
 interface ProducerStream extends Writable {
   producer: Producer;
-  connect(): void;
-  close(cb?: Function): void;
+  connect(metadataOptions: MetadataOptions): void;
+  close(cb?: callbackNoError<void>): void;
+
 }
 
 export interface ConsumerStream extends Readable {
   consumer: KafkaConsumer;
-  connect(options: any): void;
-  close(cb?: Function): void;
+
+  connect(metadataOptions: MetadataOptions): void;
+  close(cb?: callbackNoError<void>): void;
 }
 
-export interface ConsumerStreamMessage {
+export interface ConsumerStreamMessage extends TopicPartitionOffset {
+
   value: Buffer;
   size: number;
   topic: string;
