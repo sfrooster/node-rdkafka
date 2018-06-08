@@ -109,9 +109,7 @@ export interface MetadataOptionsAllTopics {
   timeout?: number;
 }
 
-export type MetadataOptions =
-  | MetadataOptionsOneTopic
-  | MetadataOptionsAllTopics;
+export type MetadataOptions = MetadataOptionsOneTopic | MetadataOptionsAllTopics;
 
 export interface Metadata {
   orig_broker_id: number;
