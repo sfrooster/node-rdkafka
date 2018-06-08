@@ -96,7 +96,7 @@ export interface DeliveryReport {
   topic: string;
   partition: number;
   offset: number;
-  opaque: any;
+  opaque?: any;
 }
 
 export interface MetadataOptionsOneTopic {
