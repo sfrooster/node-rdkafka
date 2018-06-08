@@ -222,13 +222,13 @@ interface ProducerStream extends Writable {
   close(cb?: Function): void;
 }
 
-declare interface ConsumerStream extends Readable {
+export interface ConsumerStream extends Readable {
   consumer: KafkaConsumer;
   connect(options: any): void;
   close(cb?: Function): void;
 }
 
-declare interface ConsumerStreamMessage {
+export interface ConsumerStreamMessage {
   value: Buffer;
   size: number;
   topic: string;
