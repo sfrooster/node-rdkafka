@@ -115,7 +115,7 @@ export interface Metadata {
   orig_broker_id: number;
   orig_broker_name: string;
   brokers: MetadataBroker[];
-  topics: any[];
+  topics: MetadataTopic[];
 }
 
 export interface MetadataBroker {
