@@ -81,13 +81,13 @@ export class Producer extends Client {
   poll(): any;
 
   produce(
-    topic: any,
-    partition: any,
-    message: any,
-    key?: any,
-    timestamp?: any,
+    topic: string,
+    partition: number | null,
+    message: Buffer | null,
+    key?: number[] | string,
+    timestamp?: number,
     opaque?: any
-  ): any;
+  ): boolean | Error;
 
   setPollInterval(interval: any): any;
 }
