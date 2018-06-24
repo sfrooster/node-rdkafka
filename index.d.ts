@@ -5,15 +5,15 @@ export class Client extends NodeJS.EventEmitter {
 
   connect(metadataOptions?: any, cb?: (err: any, data: any) => any): this;
 
-  getClient(): any;
+  getClient(): Client;
 
   connectedTime(): number;
 
-  getLastError(): any;
+  getLastError(): Error | null;
 
   disconnect(cb?: (err: any, data: any) => any): this;
 
-  getMetadata(metadataOptions: any, cb?: (err: any, data: any) => any): any;
+  getMetadata(metadataOptions: MetadataOptionsOneTopic | null, cb: (err: Error | null, data: Metadata) => void): void;
 
   offsetsForTimes(topicPartitions: any[], timeout: number, cb?: (err: any, offsets: any) => any): void;
   offsetsForTimes(topicPartitions: any[], cb?: (err: any, offsets: any) => any): void;
@@ -76,9 +76,13 @@ export class KafkaConsumer extends Client {
 export class Producer extends Client {
   constructor(conf: any, topicConf: any);
 
-  flush(timeout: any, callback: any): any;
+  disconnect(): Producer;
+  disconnect(cb?: (err: null, data: ClientMetrics) => void): Producer;
+  disconnect(timeout: number, cb?: (err: null, data: ClientMetrics) => void): Producer;
 
-  poll(): any;
+  flush(timeout?: number, cb?: (err: Error | null, _: never) => void): Producer;
+
+  poll(): Producer;
 
   produce(
     topic: string,
@@ -135,6 +139,19 @@ export interface MetadataPartition {
   replaicas: number[];
   isrs: number[];
 }
+
+export interface ClientMetrics {
+  connectionOpened: Date;
+}
+
+export class TopicPartition {
+  constructor(topic: string, partition: number, offset: OffsetType);
+  static create(spec: TopicSpec): TopicPartition;
+  static map(specs: TopicSpec[]): TopicPartition[];
+}
+
+export type OffsetType = "earliest" | "beginning" | "latest" | "end" | number | null | undefined;
+export type TopicSpec = { topic: string; partition: number; offset: OffsetType }
 
 export const CODES: {
   ERRORS: {
