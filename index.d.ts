@@ -89,12 +89,18 @@ export interface LibRdKafkaError extends Error {
   origin: "local" | "kafka";
 }
 
+// export interface DeliveryReport {
+//   topic: string;
+//   partition: number;
+//   offset: number;
+//   opaque?: any;
+// }
+
 export namespace Events {
   export interface DeliveryReportEvent {
     topic: string;
     partition: number;
     offset: number;
-    timestamp: number;
     opaque?: any;
   }
   interface DisconnectedEvent {
@@ -224,7 +230,7 @@ export class Client extends NodeJS.EventEmitter {
   constructor(globalConf: GlobalConfig, SubClientType: Kafka.Connection, topicConf: TopicConfig | undefined);
 
   // connect(metadataOptions: MetadataOptions, cb?: (err: Error | null, metadata: Metadata) => void): Client;
-  connect(metadataOptions: MetadataOptions, cb?: Callback<Metadata>): Client;
+  connect(metadataOptions: MetadataOptions, cb?: callback<Metadata>): Client;
 
   connectedTime(): number;
 
@@ -237,13 +243,13 @@ export class Client extends NodeJS.EventEmitter {
   getLastError(): Error | null;
 
   // getMetadata(metadataOptions: MetadataOptions, cb: (err: Error | null, data: Metadata) => void): void;
-  getMetadata(metadataOptions: MetadataOptions, cb: Callback<Metadata>): void;
+  getMetadata(metadataOptions: MetadataOptions, cb: callback<Metadata>): void;
 
   isConnected(): boolean;
 
-  offsetsForTimes(topicPartitionOffsets: SpecifiesTopicPartitionOffset[], timeout: number, cb: Callback<SpecifiesTopicPartitionOffset[]>): void;
+  offsetsForTimes(topicPartitionOffsets: SpecifiesTopicPartitionOffset[], timeout: number, cb: callback<SpecifiesTopicPartitionOffset[]>): void;
 
-  queryWatermarkOffsets(topic: string, partition: number, timeout: number, cb?: Callback<watermarkOffsets>): void;
+  queryWatermarkOffsets(topic: string, partition: number, timeout: number, cb?: callback<watermarkOffsets>): void;
 
   // queryWatermarkOffsets(
   //   topic: string,
@@ -278,15 +284,15 @@ export class KafkaConsumer extends Client {
 
   commitSync(topicPartitionOffsets: TopicPartitionOffset | TopicPartitionOffset[] | null): KafkaConsumer;
 
-  committed(topicPartitions: TopicPartition[], timeout: number, cb: Callback<TopicPartitionOffset[]>): KafkaConsumer;
-  committed(timeout: number, cb: Callback<TopicPartitionOffset[]>): KafkaConsumer;
+  committed(topicPartitions: TopicPartition[], timeout: number, cb: callback<TopicPartitionOffset[]>): KafkaConsumer;
+  committed(timeout: number, cb: callback<TopicPartitionOffset[]>): KafkaConsumer;
 
   // consume(number: any, cb?: (error: Error | null, messages: KafkaMessage[]) => void): void;
-  consume(maxMessageCount: number, cb?: Callback<KafkaMessage[]>): void;
+  consume(maxMessageCount: number, cb?: callback<KafkaMessage[]>): void;
 
   static createReadStream(conf: GlobalConfig, topicConf: TopicConfig, streamOptions: StreamConfig): ConsumerStream;
 
-  disconnect(cb?: CallbackResultOnly<ClientMetrics>): Client;
+  disconnect(cb?: callbackNoError<ClientMetrics>): Client;
 
   getWatermarkOffsets(topic: string, partition: number): watermarkOffsets;
 
@@ -299,7 +305,7 @@ export class KafkaConsumer extends Client {
   resume(topicPartitions: TopicPartition[]): true | Error;
 
   // seek(toppar: any, timeout: any, cb: any): any;
-  seek(topicPartitionOffset: TopicPartitionOffset, timeout: number | null, cb: Callback<void>): KafkaConsumer;
+  seek(topicPartitionOffset: TopicPartitionOffset, timeout: number | null, cb: callback<void>): KafkaConsumer;
 
   setDefaultConsumeTimeout(timeoutMs: number): void;
 
@@ -317,11 +323,10 @@ export class Producer extends Client {
 
   static createWriteStream(conf: GlobalConfig, topicConf: TopicConfig, streamOptions: StreamConfig): ProducerStream;
 
-  disconnect(timeout: number, cb: Callback<ClientMetrics>): void;
+  disconnect(timeout: number, cb: callback<ClientMetrics>): void;
 
   // flush(timeout?: number | null, cb?: (err: Error | null, _: never) => void): Producer;
-  // flush(timeout?: number | null, cb?: CallbackErrorOnly<Error | null>): Producer;
-  flush(timeout?: number | null, cb?: CallbackErrorOnly): Producer;
+  flush(timeout?: number | null, cb?: callbackError): Producer;
 
   poll(): Producer;
 
@@ -425,14 +430,15 @@ export const librdkafkaVersion: string;
 interface ProducerStream extends Writable {
   producer: Producer;
   connect(metadataOptions: MetadataOptions): void;
-  close(cb?: CallbackTriggerOnly): void;
+  close(cb?: callbackNoError<void>): void;
+
 }
 
 export interface ConsumerStream extends Readable {
   consumer: KafkaConsumer;
 
   connect(metadataOptions: MetadataOptions): void;
-  close(cb?: CallbackTriggerOnly): void;
+  close(cb?: callbackNoError<void>): void;
 }
 
 export interface ConsumerStreamMessage extends TopicPartitionOffset {
